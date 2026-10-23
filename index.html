@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#f6f8fa" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  <title>Redirecting...</title>
+  <meta name="author" content="VZService">
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg-start: #f6f8fa; --bg-end: #eaeef2; --card-bg: rgba(255, 255, 255, 0.85);
+      --card-border: rgba(0, 0, 0, 0.08); --text-primary: #1f2328; --text-secondary: #656d76;
+      --countdown-bg: #f6f8fa; --countdown-border: #d0d7de; --countdown-label: #656d76;
+      --countdown-number: #0969da; --loader-bg: #eaeef2; --h1-gradient-start: #1f2328;
+      --h1-gradient-end: #656d76; --icon-color: #1f2328; --btn-bg: #33ACE9;
+      --btn-bg-hover: #60d0ff; --btn-text: #ffffff;
+      --icon-img-bg: transparent; --icon-img-padding: 0; --icon-img-shadow: none;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-start: #0d1117; --bg-end: #1a1f2b; --card-bg: rgba(22, 27, 34, 0.85);
+        --card-border: rgba(240, 246, 252, 0.1); --text-primary: #e6edf3; --text-secondary: #8b949e;
+        --countdown-bg: #1c2128; --countdown-border: #30363d; --countdown-label: #8b949e;
+        --countdown-number: #58a6ff; --loader-bg: #21262d; --h1-gradient-start: #ffffff;
+        --h1-gradient-end: #8b949e; --icon-color: #e6edf3; --btn-bg: #33ACE9;
+        --btn-bg-hover: #70d6ff; --btn-text: #ffffff;
+        --icon-img-bg: rgba(255, 255, 255, 0.9); --icon-img-padding: 0.25rem; --icon-img-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      }
+    }
+
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', monospace;
+      min-height: 100vh; min-height: 100dvh; display: flex; align-items: center; justify-content: center;
+      padding: max(1.5rem, env(safe-area-inset-top)) max(1.5rem, env(safe-area-inset-right)) max(1.5rem, env(safe-area-inset-bottom)) max(1.5rem, env(safe-area-inset-left));
+      color: var(--text-primary); background: var(--bg-start);
+      -webkit-text-size-adjust: 100%; -webkit-tap-highlight-color: transparent;
+      transition: filter 0.3s ease;
+    }
+
+    /* 点击按钮后的灰色蒙版 */
+    body.clicked {
+      filter: grayscale(1) opacity(0.7);
+      pointer-events: none;
+    }
+
+    .blackout-overlay { position: fixed; inset: 0; background: #1a1a1a; z-index: 9999; opacity: 0; pointer-events: none; transition: opacity 0.2s ease; }
+    .blackout-overlay.active { opacity: 1; pointer-events: auto; }
+
+    .card {
+      background: var(--card-bg); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      border: 1px solid var(--card-border); border-radius: 2rem; padding: 2.5rem 2rem;
+      max-width: 550px; width: 100%; text-align: center;
+      box-shadow: 0 25px 40px -12px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+    }
+
+    .icon {
+      width: 4rem; height: 4rem; line-height: 1; margin-bottom: 1rem;
+      display: inline-flex; align-items: center; justify-content: center;
+      color: var(--icon-color);
+    }
+    
+    .icon svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2)); }
+    
+    .icon img {
+      width: 100%; height: 100%; display: block; object-fit: contain;
+      background: var(--icon-img-bg); padding: var(--icon-img-padding);
+      box-shadow: var(--icon-img-shadow); border-radius: 0.5rem;
+      transition: background 0.3s, padding 0.3s, box-shadow 0.3s;
+    }
+
+    h1 {
+      font-size: 2rem; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 0.75rem;
+      background: linear-gradient(135deg, var(--h1-gradient-start) 0%, var(--h1-gradient-end) 100%);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    p { font-size: 1.1rem; color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.6; }
+
+    .countdown-precise {
+      display: flex; align-items: baseline; justify-content: center; gap: 0.25rem;
+      background: var(--countdown-bg); border: 1px solid var(--countdown-border);
+      border-radius: 4rem; padding: 0.75rem 1.8rem; margin-bottom: 2rem;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Courier New', monospace;
+      font-variant-numeric: tabular-nums; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      white-space: nowrap; overflow: hidden; transition: border-color 0.3s ease;
+    }
+    .countdown-precise .label { font-size: 1rem; color: var(--countdown-label); font-weight: 400; letter-spacing: 0.02em; }
+    .countdown-precise .number { font-size: 2rem; font-weight: 700; color: var(--countdown-number); min-width: 7ch; text-align: right; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
+    .countdown-precise .unit { font-size: 1rem; color: var(--countdown-label); font-weight: 400; margin-left: 0.1rem; }
+
+    .loader { width: 100%; height: 3px; background: var(--loader-bg); border-radius: 4px; overflow: hidden; margin-top: 1.2rem; }
+    .loader-progress { height: 100%; width: 100%; background: var(--countdown-number); border-radius: 4px; animation: shrink 10s linear forwards; transform-origin: left; transition: background 0.2s linear; }
+    @keyframes shrink { 0% { width: 100%; } 100% { width: 0%; } }
+
+    .goto-btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+      margin-top: 1.8rem; padding: 0.9rem 2.2rem; font-size: 1.05rem; font-weight: 600;
+      font-family: inherit; color: var(--btn-text); 
+      background: linear-gradient(135deg, var(--btn-bg) 0%, var(--btn-bg-hover) 100%);
+      background-size: 200% 200%; background-position: 0% 50%;
+      border: none; border-radius: 2rem; cursor: pointer; text-decoration: none;
+      transition: background-position 0.4s ease, transform 0.1s, box-shadow 0.4s ease; 
+      box-shadow: 0 4px 14px rgba(51, 172, 233, 0.3);
+    }
+    .goto-btn:hover {
+      background-position: 100% 50%;
+      box-shadow: 0 6px 20px rgba(51, 172, 233, 0.5);
+    }
+    .goto-btn:active { transform: scale(0.97); }
+    .goto-btn svg { width: 1.1em; height: 1.1em; flex-shrink: 0; }
+
+    @media (max-width: 480px) {
+      body { align-items: flex-start; padding-top: max(2rem, env(safe-area-inset-top)); }
+      .card { padding: 2rem 1.2rem; border-radius: 1.5rem; margin-top: 0.5rem; }
+      h1 { font-size: 1.6rem; } p { font-size: 1rem; }
+      .icon { width: 3.2rem; height: 3.2rem; }
+      .countdown-precise { padding: 0.6rem 1rem; border-radius: 3rem; }
+      .countdown-precise .number { font-size: 1.6rem; min-width: 6ch; }
+      .countdown-precise .label, .countdown-precise .unit { font-size: 0.9rem; }
+      .goto-btn { font-size: 0.95rem; padding: 0.8rem 1.8rem; }
+    }
+    @media (prefers-reduced-motion: reduce) { .loader-progress { animation: none; width: 0%; } }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="icon" id="siteIcon" aria-hidden="true"></div>
+    <h1 id="title">going to github</h1>
+    <p id="subtitle">You will be automatically redirected</p>
+    <div class="countdown-precise" role="status" aria-live="off" id="countdownBox">
+      <span class="label" id="countdownLabel">Redirecting in</span>
+      <span class="number" id="preciseNumber">10.0000</span>
+      <span class="unit" id="countdownUnit">s</span>
+    </div>
+    <div class="loader" aria-hidden="true" id="loaderBox"><div class="loader-progress" id="loaderProgress"></div></div>
+    <a class="goto-btn" id="gotoBtn" href="#">
+      <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8.22 2.97a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 1 1-1.06-1.06l2.97-2.97H3.75a.75.75 0 0 1 0-1.5h7.44L8.22 4.03a.75.75 0 0 1 0-1.06z"/></svg>
+      <span id="gotoBtnText">Go now</span>
+    </a>
+  </main>
+  <div class="blackout-overlay" id="blackoutOverlay" aria-hidden="true"></div>
+
+  <script>
+    (function() {
+      const i18n = {
+        en: { title: 'going to github', subtitle: 'You will be automatically redirected', countdownLabel: 'Redirecting in', countdownUnit: 's', gotoBtn: 'Go now', noParam: 'Please enter via a friend\'s shared link' },
+        zh_Hant: { title: '前往 github', subtitle: '您將被自動重新導向', countdownLabel: '跳轉倒計時', countdownUnit: '秒', gotoBtn: '立即前往', noParam: '請透過好友分享的連結進入' },
+        zh_Hans: { title: '前往 github', subtitle: '您将被自动重定向', countdownLabel: '跳转倒计时', countdownUnit: '秒', gotoBtn: '立即前往', noParam: '请通过好友分享的链接进入' }
+      };
+
+      function detectLanguage() {
+        const navLang = (navigator.language || navigator.userLanguage || '').toLowerCase();
+        const docLang = (document.documentElement.lang || '').toLowerCase();
+        const combined = navLang + ' ' + docLang;
+        if (combined.includes('zh')) {
+          if (combined.includes('tw') || combined.includes('hk') || combined.includes('mo') || combined.includes('hant')) return 'zh_Hant';
+          return 'zh_Hans';
+        }
+        return 'en';
+      }
+
+      const langCode = detectLanguage();
+      const t = i18n[langCode] || i18n.en;
+
+      function getTargetUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const to = params.get('to');
+        if (!to) return null;
+        try {
+          let url = to;
+          if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+          const parsed = new URL(url);
+          if (!/^https?:$/.test(parsed.protocol)) return null;
+          return parsed.href;
+        } catch (e) { return null; }
+      }
+
+      const TARGET_URL = getTargetUrl();
+      const hasParam = !!TARGET_URL;
+
+      function getHostname(url) { 
+        if (!url) return '';
+        try { return new URL(url).hostname.replace(/^www\./, ''); } catch (e) { return ''; }
+      }
+
+      const HOSTNAME = getHostname(TARGET_URL);
+      const isGithub = /(^|\.)github\.com$/i.test(HOSTNAME);
+
+      function buildTitle() {
+        if (!hasParam) return langCode === 'en' ? 'Tip' : '提示';
+        if (isGithub) return langCode === 'en' ? 'going to github' : t.title;
+        const main = HOSTNAME.split('.')[0].toLowerCase();
+        return langCode === 'en' ? 'going to ' + main : t.title.replace(/github/i, main);
+      }
+
+      function renderIcon() {
+        const iconEl = document.getElementById('siteIcon');
+        iconEl.innerHTML = '';
+
+        const fallbackSvg = '<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0ZM8 1.5a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13ZM7.25 5a.75.75 0 1 1 1.5 0 .75.75 0 0 1-1.5 0Zm.25 2.5a.75.75 0 0 1 1.5 0v3.25a.75.75 0 0 1-1.5 0V7.5Z"/></svg>';
+
+        if (!hasParam) {
+          iconEl.innerHTML = fallbackSvg;
+          return;
+        }
+
+        if (isGithub) {
+          iconEl.innerHTML = '<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" role="img"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>';
+          return;
+        }
+
+        const faviconUrl = 'https://' + HOSTNAME + '/favicon.ico';
+        const img = new Image();
+        img.referrerPolicy = 'no-referrer';
+        
+        const showFallback = () => {
+          iconEl.innerHTML = fallbackSvg;
+        };
+
+        const timer = setTimeout(() => {
+          img.src = ''; 
+          showFallback();
+        }, 3000);
+
+        img.onload = function() {
+          clearTimeout(timer);
+          iconEl.innerHTML = '';
+          iconEl.appendChild(img);
+        };
+        img.onerror = function() {
+          clearTimeout(timer);
+          showFallback();
+        };
+        img.src = faviconUrl;
+      }
+
+      function updateFavicon() {
+        const dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const color = dark ? '%23e6edf3' : '%231f2328';
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="${color}" viewBox="0 0 10 10"><path d="M4.033 4.417A1.67 1.67 0 0 1 5.67 3.075h1.18a1.726 1.726 0 0 1 0 3.45.425.425 0 1 1 0-.85.876.876 0 0 0 0-1.75H5.67a.82.82 0 0 0-.803.659.425.425 0 0 1-.834-.167M1.425 5.2c0-.953.772-1.725 1.724-1.726a.426.426 0 0 1 0 .85.876.876 0 0 0 0 1.75H4.33a.82.82 0 0 0 .803-.658.426.426 0 0 1 .834.167A1.67 1.67 0 0 1 4.33 6.925H3.15a1.725 1.725 0 0 1-1.725-1.724"/></svg>`;
+        
+        let icon = document.querySelector('link[rel="icon"]');
+        if (!icon) {
+          icon = document.createElement('link');
+          icon.rel = 'icon';
+          document.head.appendChild(icon);
+        }
+        icon.type = 'image/svg+xml';
+        icon.href = 'data:image/svg+xml,' + encodeURIComponent(svg);
+      }
+
+      renderIcon();
+      updateFavicon();
+
+      const countdownBox = document.getElementById('countdownBox');
+      const loaderBox = document.getElementById('loaderBox');
+      const gotoBtn = document.getElementById('gotoBtn');
+      const titleEl = document.getElementById('title');
+      const subtitleEl = document.getElementById('subtitle');
+
+      // 页面逻辑控制
+      if (!hasParam) {
+        // 无参数状态：不跳转，显示提示
+        document.title = 'Tip';
+        titleEl.textContent = langCode === 'en' ? 'Tip' : '提示';
+        subtitleEl.textContent = t.noParam;
+        countdownBox.style.display = 'none';
+        loaderBox.style.display = 'none';
+        gotoBtn.style.display = 'none';
+      } else {
+        // 有参数状态：正常倒计时与跳转
+        // 这里修复了有参数时 <title> 也被显示为 Tip 的问题
+        document.title = 'Redirecting...';
+        titleEl.textContent = buildTitle();
+        subtitleEl.textContent = t.subtitle;
+        document.getElementById('countdownLabel').textContent = t.countdownLabel;
+        document.getElementById('countdownUnit').textContent = t.countdownUnit;
+        document.getElementById('gotoBtnText').textContent = t.gotoBtn;
+        gotoBtn.href = TARGET_URL;
+
+        // 倒计时与动画
+        const TOTAL_DELAY_MS = 10000; const GREEN_FULL_MS = 3000; const BLACKOUT_MS = 0.001111;
+        const preciseNumberEl = document.getElementById('preciseNumber');
+        const loaderProgressEl = document.getElementById('loaderProgress');
+        const bodyEl = document.body;
+        const blackoutOverlay = document.getElementById('blackoutOverlay');
+        const DECIMALS = 4; const FACTOR = Math.pow(10, DECIMALS);
+        const startTime = performance.now(); let rafId = null; let blackoutActive = false;
+
+        const COLORS = {
+          light: { bgStart: { r: 0xf6, g: 0xf8, b: 0xfa }, bgEnd: { r: 0xea, g: 0xee, b: 0xf2 }, greenStart: { r: 0xe6, g: 0xfc, b: 0xeb }, greenEnd: { r: 0xc8, g: 0xf5, b: 0xd3 } },
+          dark: { bgStart: { r: 0x0d, g: 0x11, b: 0x17 }, bgEnd: { r: 0x1a, g: 0x1f, b: 0x2b }, greenStart: { r: 0x11, g: 0x33, b: 0x21 }, greenEnd: { r: 0x18, g: 0x44, b: 0x2c } }
+        };
+
+        function lerp(a, b, t) { return a + (b - a) * t; }
+        function interpolateColor(from, to, t) { return { r: Math.round(lerp(from.r, to.r, t)), g: Math.round(lerp(from.g, to.g, t)), b: Math.round(lerp(from.b, to.b, t)) }; }
+        function rgbStr(c) { return `rgb(${c.r}, ${c.g}, ${c.b})`; }
+
+        function computeBackground(remainingMs) {
+          const dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          const palette = dark ? COLORS.dark : COLORS.light;
+          let progress = remainingMs >= TOTAL_DELAY_MS ? 0 : remainingMs <= GREEN_FULL_MS ? 1 : (TOTAL_DELAY_MS - remainingMs) / (TOTAL_DELAY_MS - GREEN_FULL_MS);
+          const startColor = interpolateColor(palette.bgStart, palette.greenStart, progress);
+          const endColor = interpolateColor(palette.bgEnd, palette.greenEnd, progress);
+          return `linear-gradient(145deg, ${rgbStr(startColor)} 0%, ${rgbStr(endColor)} 100%)`;
+        }
+
+        function computeAccentColor(remainingMs) {
+          const dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          const blue = dark ? { r: 0x58, g: 0xa6, b: 0xff } : { r: 0x09, g: 0x69, b: 0xda };
+          const green = dark ? { r: 0x7e, g: 0xe7, b: 0x87 } : { r: 0x1a, g: 0x7f, b: 0x37 };
+          let progress = remainingMs >= TOTAL_DELAY_MS ? 0 : remainingMs <= GREEN_FULL_MS ? 1 : (TOTAL_DELAY_MS - remainingMs) / (TOTAL_DELAY_MS - GREEN_FULL_MS);
+          return rgbStr(interpolateColor(blue, green, progress));
+        }
+
+        function computeLoaderColor(remainingMs) {
+          const dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          const blueLight = dark ? { r: 0x7e, g: 0xc0, b: 0xff } : { r: 0x4a, g: 0x9e, b: 0xf0 };
+          const greenLight = dark ? { r: 0xa8, g: 0xf0, b: 0xb0 } : { r: 0x4a, g: 0xb8, b: 0x6a };
+          let progress = remainingMs >= TOTAL_DELAY_MS ? 0 : remainingMs <= GREEN_FULL_MS ? 1 : (TOTAL_DELAY_MS - remainingMs) / (TOTAL_DELAY_MS - GREEN_FULL_MS);
+          return rgbStr(interpolateColor(blueLight, greenLight, progress));
+        }
+
+        function formatRemaining(remainingMs) {
+          let seconds = remainingMs / 1000;
+          if (seconds < 0) seconds = 0;
+          let rounded = Math.round(seconds * FACTOR) / FACTOR;
+          if (rounded > 10) rounded = 10;
+          if (rounded < 0.0001) rounded = 0;
+          return rounded.toFixed(DECIMALS);
+        }
+
+        function activateBlackout() { if (!blackoutActive) { blackoutActive = true; blackoutOverlay.classList.add('active'); } }
+
+        function updateStyles(remainingMs) {
+          preciseNumberEl.textContent = formatRemaining(remainingMs);
+          bodyEl.style.background = computeBackground(remainingMs);
+          preciseNumberEl.style.color = computeAccentColor(remainingMs);
+          loaderProgressEl.style.background = computeLoaderColor(remainingMs);
+          if (remainingMs <= BLACKOUT_MS * 1000) activateBlackout();
+        }
+
+        function updateCountdown() {
+          const now = performance.now();
+          const remainingMs = Math.max(0, TOTAL_DELAY_MS - (now - startTime));
+          updateStyles(remainingMs);
+          if (remainingMs > 0) rafId = requestAnimationFrame(updateCountdown);
+          else { preciseNumberEl.textContent = (0).toFixed(DECIMALS); updateStyles(0); if (rafId) { cancelAnimationFrame(rafId); rafId = null; } }
+        }
+
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+          updateFavicon();
+          const now = performance.now();
+          const remainingMs = Math.max(0, TOTAL_DELAY_MS - (now - startTime));
+          updateStyles(remainingMs);
+        });
+
+        const redirectTimeout = setTimeout(function() {
+          preciseNumberEl.textContent = (0).toFixed(DECIMALS);
+          updateStyles(0);
+          if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+          window.location.href = TARGET_URL;
+        }, TOTAL_DELAY_MS);
+
+        // 点击按钮：暂停计时、变灰、然后跳转
+        gotoBtn.addEventListener('click', function(e) {
+          e.preventDefault();
+          
+          // 1. 暂停计时并取消自动跳转
+          if (redirectTimeout) clearTimeout(redirectTimeout);
+          if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+          
+          // 2. 停止进度条动画并修改背景色
+          loaderProgressEl.style.animation = 'none';
+          loaderProgressEl.style.width = '0%';
+          bodyEl.style.background = computeBackground(0); // 强制变成纯绿背景
+
+          // 3. 页面变灰
+          bodyEl.classList.add('clicked');
+          
+          // 4. 稍作延迟让用户看清灰色效果后跳转
+          setTimeout(function() {
+            window.location.href = TARGET_URL;
+          }, 300);
+        });
+
+        (function init() {
+          const now = performance.now();
+          const remainingMs = Math.max(0, TOTAL_DELAY_MS - (now - startTime));
+          updateStyles(remainingMs);
+          rafId = requestAnimationFrame(updateCountdown);
+        })();
+
+        window.addEventListener('beforeunload', function() {
+          if (redirectTimeout) clearTimeout(redirectTimeout);
+          if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+        });
+      }
+    })();
+  </script>
+</body>
+</html>
