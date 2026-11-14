@@ -1,0 +1,8 @@
+# VZ-Redirect-Proxy 内置白名单 (allowlist)
+# 一行一个域名；支持通配符 *.example.com（匹配其子域名，不匹配裸域名本身）
+# 可选协议前缀 https:// 或 http://，不写则 http / https 均可
+# 不在列表中的域名将被拦截，不会跳转
+
+*.vzservice.top
+github.com
+*.cloudflare.com

@@ -147,11 +147,11 @@
   <div class="blackout-overlay" id="blackoutOverlay" aria-hidden="true"></div>
 
   <script>
-    (function() {
+    (async function() {
       const i18n = {
-        en: { title: 'going to github', subtitle: 'You will be automatically redirected', countdownLabel: 'Redirecting in', countdownUnit: 's', gotoBtn: 'Go now', noParam: 'Please enter via a friend\'s shared link' },
-        zh_Hant: { title: '前往 github', subtitle: '您將被自動重新導向', countdownLabel: '跳轉倒計時', countdownUnit: '秒', gotoBtn: '立即前往', noParam: '請透過好友分享的連結進入' },
-        zh_Hans: { title: '前往 github', subtitle: '您将被自动重定向', countdownLabel: '跳转倒计时', countdownUnit: '秒', gotoBtn: '立即前往', noParam: '请通过好友分享的链接进入' }
+        en: { title: 'going to github', subtitle: 'You will be automatically redirected', countdownLabel: 'Redirecting in', countdownUnit: 's', gotoBtn: 'Go now', noParam: 'Please enter via a friend\'s shared link', blockedTitle: 'Blocked', blockedSubtitle: "This domain isn't on the allowlist, so it can't be redirected." },
+        zh_Hant: { title: '前往 github', subtitle: '您將被自動重新導向', countdownLabel: '跳轉倒計時', countdownUnit: '秒', gotoBtn: '立即前往', noParam: '請透過好友分享的連結進入', blockedTitle: '已攔截', blockedSubtitle: '該域名不在白名單中，無法跳轉。' },
+        zh_Hans: { title: '前往 github', subtitle: '您将被自动重定向', countdownLabel: '跳转倒计时', countdownUnit: '秒', gotoBtn: '立即前往', noParam: '请通过好友分享的链接进入', blockedTitle: '已拦截', blockedSubtitle: '该域名不在白名单中，无法跳转。' }
       };
 
       function detectLanguage() {
@@ -192,6 +192,79 @@
       const HOSTNAME = getHostname(TARGET_URL);
       const isGithub = /(^|\.)github\.com$/i.test(HOSTNAME);
 
+      // ===== 内置白名单 (allowlist) =====
+      // /WhiteList 文件为权威来源（仓库根目录，一行一个域名）。
+      // 本常量作为离线 / file:// 预览时的兜底，内容与 /WhiteList 保持一致。
+      const WHITELIST_FALLBACK = `# VZ-Redirect-Proxy 内置白名单 (allowlist)
+# 一行一个域名；支持通配符 *.example.com（匹配其子域名，不匹配裸域名本身）
+# 可选协议前缀 https:// 或 http://，不写则 http / https 均可
+# 不在列表中的域名将被拦截，不会跳转
+
+*.vzservice.top
+github.com
+*.cloudflare.com`;
+
+      // 解析白名单文本：支持 # 注释、可选协议前缀、*. 通配符
+      function parseWhitelist(text) {
+        const entries = [];
+        const lines = String(text || '').split(/\r?\n/);
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line || line.charAt(0) === '#') continue;
+          let schemes = ['http', 'https'];
+          let host = line;
+          const sm = line.match(/^(https?):\/\/(.+)$/i);
+          if (sm) {
+            schemes = [sm[1].toLowerCase()];
+            host = sm[2].trim();
+          }
+          let wildcard = false;
+          if (host.indexOf('*.') === 0) {
+            wildcard = true;
+            host = host.slice(2);
+          }
+          if (!host) continue;
+          entries.push({ schemes: schemes, host: host.toLowerCase(), wildcard: wildcard });
+        }
+        return entries;
+      }
+
+      // 判断目标是否被白名单允许
+      function isAllowed(entries, targetUrl, hostname) {
+        if (!hostname) return false;
+        let scheme = 'https';
+        try { scheme = new URL(targetUrl).protocol.replace(':', '').toLowerCase(); } catch (e) {}
+        for (let i = 0; i < entries.length; i++) {
+          const e = entries[i];
+          if (e.schemes.indexOf(scheme) === -1) continue;
+          if (e.wildcard) {
+            // *.example.com 匹配 a.example.com / a.b.example.com，但不匹配 example.com 本身
+            if (hostname.length > e.host.length && hostname.endsWith('.' + e.host)) return true;
+          } else if (hostname === e.host) {
+            return true;
+          }
+        }
+        return false;
+      }
+
+      // 运行时加载白名单：优先读取 /WhiteList，失败则回退到内置常量
+      async function loadWhitelist() {
+        let text = null;
+        try {
+          const res = await fetch('WhiteList', { cache: 'no-cache' });
+          if (res && res.ok) text = await res.text();
+        } catch (err) { text = null; }
+        if (text === null) text = WHITELIST_FALLBACK;
+        let entries = parseWhitelist(text);
+        // 文件为空（部署异常）时回退到内置白名单，避免整页被拦截
+        if (entries.length === 0) entries = parseWhitelist(WHITELIST_FALLBACK);
+        return entries;
+      }
+
+      const whitelist = await loadWhitelist();
+      const allowed = !hasParam || isAllowed(whitelist, TARGET_URL, HOSTNAME);
+      const isBlocked = hasParam && !allowed;
+
       function buildTitle() {
         if (!hasParam) return langCode === 'en' ? 'Tip' : '提示';
         if (isGithub) return langCode === 'en' ? 'going to github' : t.title;
@@ -219,6 +292,9 @@
         // 其余站点：先立即显示内置 "i"，再拉取目标站 favicon
         // 成功且为有效图片才替换；失败 / 超时 / 裂图均保持 "i"
         iconEl.innerHTML = infoSvg;
+
+        // 被白名单拦截：不向目标站发请求，仅保留 "i"
+        if (isBlocked) return;
 
         const faviconUrl = 'https://' + HOSTNAME + '/favicon.ico';
         const img = new Image();
@@ -270,6 +346,14 @@
         document.title = 'Tip';
         titleEl.textContent = langCode === 'en' ? 'Tip' : '提示';
         subtitleEl.textContent = t.noParam;
+        countdownBox.style.display = 'none';
+        loaderBox.style.display = 'none';
+        gotoBtn.style.display = 'none';
+      } else if (isBlocked) {
+        // 被白名单拦截：不跳转，显示拦截提示
+        document.title = langCode === 'en' ? 'Blocked' : t.blockedTitle;
+        titleEl.textContent = t.blockedTitle;
+        subtitleEl.textContent = t.blockedSubtitle;
         countdownBox.style.display = 'none';
         loaderBox.style.display = 'none';
         gotoBtn.style.display = 'none';

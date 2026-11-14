@@ -12,6 +12,7 @@ A minimalist, beautiful, and feature-rich **redirect intermediary page**. It sup
 - **Millisecond Countdown**: A 10-second countdown (with 4 decimal places). In the last 3 seconds, the background smoothly transitions to green, the progress bar gradients, and it smoothly blackouts and redirects when it hits zero.
 - **Smart Icon Fetching**: Automatically requests the target site's `favicon.ico`. In dark mode, it automatically adds a white background to prevent black icons from blending in. If the target has no icon or times out, it gracefully falls back to an inline "circle i" SVG.
 - **Quick Jump**: Provides a "Go now" button (with a bright blue gradient hover effect). Clicking it immediately freezes the countdown, turns the page grayscale, cancels the auto-redirect, and navigates to the target site after 0.3 seconds.
+- **Built-in Allowlist**: Only domains listed in the `/WhiteList` file can be redirected. Supports `*.example.com` wildcards and optional `https://`/`http://` scheme prefixes; anything else is blocked with a clear message.
 - **Extremely Lightweight**: The entire code is contained in a single HTML file with zero external CSS/JS framework dependencies. Native support for dark/light mode (`prefers-color-scheme`).
 
 ## 🚀 How to Use
@@ -32,11 +33,28 @@ If a user visits `https://url-r.pages.dev/` directly (without the `to` parameter
 ### 3. Customize Styles
 Modify the CSS variables in `:root` and `@media (prefers-color-scheme: dark)` within the `<style>` tag to quickly customize the theme color, button color (default `#33ACE9`), etc.
 
+### 4. Built-in Allowlist (`/WhiteList`)
+
+The proxy only redirects to domains listed in the `/WhiteList` file at the repo root. This prevents the page from being abused to redirect visitors to arbitrary / malicious sites.
+
+- **Format**: one domain per line.
+- **Wildcard**: `*.example.com` matches any subdomain of `example.com` (but **not** `example.com` itself).
+- **Optional scheme**: prefix with `https://` or `http://` to limit to that scheme; with no prefix, both `http` and `https` are allowed.
+- **Comments**: lines starting with `#` are ignored.
+- **Blocked behavior**: if the requested `?to=` domain is not in the list, the page shows a "Blocked" message and does **not** redirect.
+
+Example `/WhiteList`:
+```
+*.vzservice.top
+github.com
+*.cloudflare.com
+```
+
 ## 🛠️ Technical Details
 
 - **Vanilla Implementation**: ES6 syntax, using `requestAnimationFrame` for smooth countdowns.
 - **Anti-Black-Box Favicon**: The tab icon is hardcoded to a specific SVG, avoiding the dark mode black box bug by replacing the `fill` color.
-- **Security Protection**: Uses `new URL()` to strictly validate redirect parameter protocols (only `http/https` allowed). Includes a 3-second timeout fallback for icon fetching to prevent malicious parameters from freezing the page.
+- **Security Protection**: Uses `new URL()` to strictly validate redirect parameter protocols (only `http/https` allowed), and enforces a built-in allowlist (`/WhiteList`) so only pre-approved domains can be redirected. Includes a 3-second timeout fallback for icon fetching to prevent malicious parameters from freezing the page.
 
 ## 📄 License
 MIT License. See the `LICENSE` file for details.
